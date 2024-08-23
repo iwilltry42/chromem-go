@@ -470,15 +470,10 @@ func (c *Collection) queryEmbedding(ctx context.Context, queryEmbedding, negativ
 		return nil, nil
 	}
 
-	// Validate whereDocument operators
-	for _, whereDocument := range whereDocuments {
-		if err := whereDocument.Validate(); err != nil {
-			return nil, fmt.Errorf("invalid whereDocument %#v: %w", whereDocument, err)
-		}
+	filteredDocs, err := c.GetDocuments(ctx, where, whereDocuments)
+	if err != nil {
+		return nil, err
 	}
-
-	// Filter docs by metadata and content
-	filteredDocs := filterDocs(c.documents, where, whereDocuments)
 
 	// No need to continue if the filters got rid of all documents
 	if len(filteredDocs) == 0 {
@@ -516,6 +511,23 @@ func (c *Collection) queryEmbedding(ctx context.Context, queryEmbedding, negativ
 	}
 
 	return res, nil
+}
+
+func (c *Collection) GetDocuments(ctx context.Context, where map[string]string, whereDocuments []WhereDocument) ([]*Document, error) {
+	c.documentsLock.RLock()
+	defer c.documentsLock.RUnlock()
+
+	// Validate whereDocument operators
+	for _, whereDocument := range whereDocuments {
+		if err := whereDocument.Validate(); err != nil {
+			return nil, fmt.Errorf("invalid whereDocument %#v: %w", whereDocument, err)
+		}
+	}
+
+	// Filter docs by metadata and content
+	filteredDocs := filterDocs(c.documents, where, whereDocuments)
+
+	return filteredDocs, nil
 }
 
 // getDocPath generates the path to the document file.
