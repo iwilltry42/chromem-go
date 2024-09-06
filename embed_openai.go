@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"os"
 	"sync"
+	"time"
 )
 
 const BaseURLOpenAI = "https://api.openai.com/v1"
@@ -111,7 +113,7 @@ func newEmbeddingFuncOpenAICompat(baseURL, apiKey, model string, normalized *boo
 		req.URL.RawQuery = q.Encode()
 
 		// Send the request.
-		resp, err := client.Do(req)
+		resp, err := requestWithExponentialBackoff(ctx, client, req, 5, true)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't send request: %w", err)
 		}
@@ -158,4 +160,40 @@ func newEmbeddingFuncOpenAICompat(baseURL, apiKey, model string, normalized *boo
 
 		return v, nil
 	}
+}
+
+func requestWithExponentialBackoff(ctx context.Context, client *http.Client, req *http.Request, maxRetries int, handleRateLimit bool) (*http.Response, error) {
+
+	const baseDelay = time.Millisecond * 200
+	var resp *http.Response
+	var err error
+
+	for i := 0; i < maxRetries; i++ {
+		resp, err = client.Do(req)
+		if err == nil && resp.StatusCode == http.StatusOK {
+			return resp, nil
+		}
+
+		if resp != nil {
+			resp.Body.Close()
+		}
+
+		if resp != nil {
+			if resp.StatusCode >= 500 || (handleRateLimit && resp.StatusCode == http.StatusTooManyRequests) {
+				// Retry for 5xx (Server Errors)
+				// We're also handling rate limit here (without checking the Retry-After header), if handleRateLimit is true,
+				// since it's what e.g. OpenAI recommends (see https://github.com/openai/openai-cookbook/blob/457f4310700f93e7018b1822213ca99c613dbd1b/examples/How_to_handle_rate_limits.ipynb).
+				delay := baseDelay * time.Duration(1<<i)
+				jitter := time.Duration(rand.Int63n(int64(baseDelay)))
+				time.Sleep(delay + jitter)
+				continue
+			} else {
+				// Don't retry for other status codes
+				break
+			}
+		}
+
+	}
+
+	return nil, err
 }
