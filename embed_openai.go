@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -114,13 +115,19 @@ func NewEmbeddingFuncOpenAICompat(config *openAICompatConfig) EmbeddingFunc {
 		// Send the request.
 		resp, err := requestWithExponentialBackoff(ctx, client, req, 5, true)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't send request: %w", err)
+			return nil, fmt.Errorf("error sending request(s): %w", err)
 		}
-		defer resp.Body.Close()
+		if resp != nil && resp.Body != nil {
+			defer resp.Body.Close()
+		}
 
 		// Check the response status.
 		if resp.StatusCode != http.StatusOK {
 			return nil, errors.New("error response from the embedding API: " + resp.Status)
+		}
+
+		if resp.Body == nil {
+			return nil, fmt.Errorf("response body is nil")
 		}
 
 		// Read and decode the response body.
@@ -209,6 +216,8 @@ func requestWithExponentialBackoff(ctx context.Context, client *http.Client, req
 	var resp *http.Response
 	var err error
 
+	var failures []string
+
 	for i := 0; i < maxRetries; i++ {
 		resp, err = client.Do(req)
 		if err == nil && resp.StatusCode == http.StatusOK {
@@ -216,10 +225,8 @@ func requestWithExponentialBackoff(ctx context.Context, client *http.Client, req
 		}
 
 		if resp != nil {
+			failures = append(failures, fmt.Sprintf("#%d/%d: %d (err: %v)", i+1, maxRetries, resp.StatusCode, err))
 			resp.Body.Close()
-		}
-
-		if resp != nil {
 			if resp.StatusCode >= 500 || (handleRateLimit && resp.StatusCode == http.StatusTooManyRequests) {
 				// Retry for 5xx (Server Errors)
 				// We're also handling rate limit here (without checking the Retry-After header), if handleRateLimit is true,
@@ -236,5 +243,5 @@ func requestWithExponentialBackoff(ctx context.Context, client *http.Client, req
 
 	}
 
-	return nil, err
+	return nil, fmt.Errorf("requesting embeddings - retry limit (%d) exceeded: %v", maxRetries, strings.Join(failures, "; "))
 }
