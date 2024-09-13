@@ -218,15 +218,37 @@ func requestWithExponentialBackoff(ctx context.Context, client *http.Client, req
 
 	var failures []string
 
+	// Save the original request body
+	var bodyBytes []byte
+	if req.Body != nil {
+		bodyBytes, err = io.ReadAll(req.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read request body: %v", err)
+		}
+	}
+
 	for i := 0; i < maxRetries; i++ {
+		// Reset body to the original request body
+		if bodyBytes != nil {
+			req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+		}
+
 		resp, err = client.Do(req)
 		if err == nil && resp.StatusCode == http.StatusOK {
 			return resp, nil
 		}
 
 		if resp != nil {
-			failures = append(failures, fmt.Sprintf("#%d/%d: %d (err: %v)", i+1, maxRetries, resp.StatusCode, err))
-			resp.Body.Close()
+			var bodystr string
+			if resp.Body != nil {
+				body, rerr := io.ReadAll(resp.Body)
+				if rerr == nil {
+					bodystr = string(body)
+				}
+				resp.Body.Close()
+			}
+			failures = append(failures, fmt.Sprintf("#%d/%d: %d <%s> (err: %v)", i+1, maxRetries, resp.StatusCode, bodystr, err))
+
 			if resp.StatusCode >= 500 || (handleRateLimit && resp.StatusCode == http.StatusTooManyRequests) {
 				// Retry for 5xx (Server Errors)
 				// We're also handling rate limit here (without checking the Retry-After header), if handleRateLimit is true,
@@ -243,5 +265,5 @@ func requestWithExponentialBackoff(ctx context.Context, client *http.Client, req
 
 	}
 
-	return nil, fmt.Errorf("requesting embeddings - retry limit (%d) exceeded: %v", maxRetries, strings.Join(failures, "; "))
+	return nil, fmt.Errorf("requesting embeddings - retry limit (%d) exceeded or failed with non-retriable error: %v", maxRetries, strings.Join(failures, "; "))
 }
