@@ -71,7 +71,9 @@ func NewEmbeddingFuncOpenAICompat(config *openAICompatConfig) EmbeddingFunc {
 	// We don't set a default timeout here, although it's usually a good idea.
 	// In our case though, the library user can set the timeout on the context,
 	// and it might have to be a long timeout, depending on the text length.
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: 120 * time.Second,
+	}
 
 	var checkedNormalized bool
 	checkNormalized := sync.Once{}
