@@ -13,6 +13,32 @@ import (
 	"sync"
 )
 
+type dbOptions struct {
+	onCorruptedCollectionBehavior OnCorruptedCollectionBehavior
+}
+
+func defaultDBOptions() *dbOptions {
+	return &dbOptions{
+		onCorruptedCollectionBehavior: OnCorruptedError,
+	}
+}
+
+type DBOption func(*dbOptions)
+
+func WithOnCorruptedCollectionBehavior(behavior OnCorruptedCollectionBehavior) DBOption {
+	return func(o *dbOptions) {
+		o.onCorruptedCollectionBehavior = behavior
+	}
+}
+
+type OnCorruptedCollectionBehavior string
+
+const (
+	OnCorruptedSkip   OnCorruptedCollectionBehavior = "skip"
+	OnCorruptedError  OnCorruptedCollectionBehavior = "error"
+	OnCorruptedDelete OnCorruptedCollectionBehavior = "delete"
+)
+
 // EmbeddingFunc is a function that creates embeddings for a given text.
 // chromem-go will use OpenAI`s "text-embedding-3-small" model by default,
 // but you can provide your own function, using any model you like.
@@ -65,7 +91,13 @@ func NewDB() *DB {
 // [DB.ExportToFile] / [DB.ExportToWriter] and [DB.ImportFromFile] /
 // [DB.ImportFromReader] to export and import the entire DB to/from a file or
 // writer/reader, which also works for the pure in-memory DB.
-func NewPersistentDB(path string, compress bool) (*DB, error) {
+func NewPersistentDB(path string, compress bool, opts ...DBOption) (*DB, error) {
+
+	cfg := defaultDBOptions()
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
 	if path == "" {
 		path = "./chromem-go"
 	} else {
@@ -169,9 +201,24 @@ func NewPersistentDB(path string, compress bool) (*DB, error) {
 		if c.Name == "" && len(c.documents) == 0 {
 			continue
 		}
-		// If we have no name, it means there was no metadata file
+		// If we have no name, it means there was no metadata file.
+		// This can happen if ingestion process was interrupted, leaving the whole database in a corrupted state
+		// so you can choose to skip the corrupted collection, delete it or error out.
 		if c.Name == "" {
-			return nil, fmt.Errorf("collection metadata file not found: %s", collectionPath)
+			switch cfg.onCorruptedCollectionBehavior {
+			case OnCorruptedSkip:
+				continue
+			case OnCorruptedDelete:
+				err := os.RemoveAll(collectionPath)
+				if err != nil {
+					return nil, fmt.Errorf("couldn't delete corrupted collection directory: %w", err)
+				}
+				continue
+			case OnCorruptedError:
+				return nil, fmt.Errorf("collection metadata file not found: %s", collectionPath)
+			default:
+				return nil, fmt.Errorf("unknown onCorrupted behavior: %s", cfg.onCorruptedCollectionBehavior)
+			}
 		}
 
 		db.collections[c.Name] = c
