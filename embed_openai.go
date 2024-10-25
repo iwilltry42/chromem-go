@@ -114,29 +114,12 @@ func NewEmbeddingFuncOpenAICompat(config *openAICompatConfig) EmbeddingFunc {
 		}
 		req.URL.RawQuery = q.Encode()
 
-		// Send the request.
-		resp, err := requestWithExponentialBackoff(ctx, client, req, 5, true)
+		// Send the request and get the body.
+		body, err := requestWithExponentialBackoff(ctx, client, req, 5, true)
 		if err != nil {
 			return nil, fmt.Errorf("error sending request(s): %w", err)
 		}
-		if resp != nil && resp.Body != nil {
-			defer resp.Body.Close()
-		}
 
-		// Check the response status.
-		if resp.StatusCode != http.StatusOK {
-			return nil, errors.New("error response from the embedding API: " + resp.Status)
-		}
-
-		if resp.Body == nil {
-			return nil, fmt.Errorf("response body is nil")
-		}
-
-		// Read and decode the response body.
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't read response body: %w", err)
-		}
 		var embeddingResponse openAIResponse
 		err = json.Unmarshal(body, &embeddingResponse)
 		if err != nil {
@@ -212,7 +195,7 @@ func (c *openAICompatConfig) WithNormalized(normalized bool) *openAICompatConfig
 	return c
 }
 
-func requestWithExponentialBackoff(ctx context.Context, client *http.Client, req *http.Request, maxRetries int, handleRateLimit bool) (*http.Response, error) {
+func requestWithExponentialBackoff(ctx context.Context, client *http.Client, req *http.Request, maxRetries int, handleRateLimit bool) ([]byte, error) {
 
 	const baseDelay = time.Millisecond * 200
 	var resp *http.Response
@@ -237,7 +220,20 @@ func requestWithExponentialBackoff(ctx context.Context, client *http.Client, req
 
 		resp, err = client.Do(req)
 		if err == nil && resp.StatusCode == http.StatusOK {
-			return resp, nil
+			if resp.Body == nil {
+				return nil, fmt.Errorf("response body is nil")
+			}
+			defer resp.Body.Close()
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				// Request was OK, but we hit an error reading the response body.
+				// This is likely a transient error, so we retry.
+				failures = append(failures, fmt.Sprintf("#%d/%d: failed to read response body: %v", i+1, maxRetries, err))
+				continue
+			}
+
+			return body, nil
 		}
 
 		if resp != nil {
