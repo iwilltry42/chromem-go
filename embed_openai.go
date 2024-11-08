@@ -27,7 +27,7 @@ const (
 	EmbeddingModelOpenAI3Large EmbeddingModelOpenAI = "text-embedding-3-large"
 )
 
-type openAIResponse struct {
+type OpenAIResponse struct {
 	Data []struct {
 		Embedding []float32 `json:"embedding"`
 	} `json:"data"`
@@ -63,7 +63,7 @@ func NewEmbeddingFuncOpenAI(apiKey string, model EmbeddingModelOpenAI) Embedding
 // model are already normalized, as is the case for OpenAI's and Mistral's models.
 // The flag is optional. If it's nil, it will be autodetected on the first request
 // (which bears a small risk that the vector just happens to have a length of 1).
-func NewEmbeddingFuncOpenAICompat(config *openAICompatConfig) EmbeddingFunc {
+func NewEmbeddingFuncOpenAICompat(config *OpenAICompatConfig) EmbeddingFunc {
 	if config == nil {
 		panic("config must not be nil")
 	}
@@ -120,7 +120,7 @@ func NewEmbeddingFuncOpenAICompat(config *openAICompatConfig) EmbeddingFunc {
 			return nil, fmt.Errorf("error sending request(s): %w", err)
 		}
 
-		var embeddingResponse openAIResponse
+		var embeddingResponse OpenAIResponse
 		err = json.Unmarshal(body, &embeddingResponse)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't unmarshal response body: %w", err)
@@ -136,24 +136,24 @@ func NewEmbeddingFuncOpenAICompat(config *openAICompatConfig) EmbeddingFunc {
 			if *config.normalized {
 				return v, nil
 			}
-			return normalizeVector(v), nil
+			return NormalizeVector(v), nil
 		}
 		checkNormalized.Do(func() {
-			if isNormalized(v) {
+			if IsNormalized(v) {
 				checkedNormalized = true
 			} else {
 				checkedNormalized = false
 			}
 		})
 		if !checkedNormalized {
-			v = normalizeVector(v)
+			v = NormalizeVector(v)
 		}
 
 		return v, nil
 	}
 }
 
-type openAICompatConfig struct {
+type OpenAICompatConfig struct {
 	baseURL string
 	apiKey  string
 	model   string
@@ -165,8 +165,8 @@ type openAICompatConfig struct {
 	queryParams        map[string]string
 }
 
-func NewOpenAICompatConfig(baseURL, apiKey, model string) *openAICompatConfig {
-	return &openAICompatConfig{
+func NewOpenAICompatConfig(baseURL, apiKey, model string) *OpenAICompatConfig {
+	return &OpenAICompatConfig{
 		baseURL: baseURL,
 		apiKey:  apiKey,
 		model:   model,
@@ -175,22 +175,22 @@ func NewOpenAICompatConfig(baseURL, apiKey, model string) *openAICompatConfig {
 	}
 }
 
-func (c *openAICompatConfig) WithEmbeddingsEndpoint(endpoint string) *openAICompatConfig {
+func (c *OpenAICompatConfig) WithEmbeddingsEndpoint(endpoint string) *OpenAICompatConfig {
 	c.embeddingsEndpoint = endpoint
 	return c
 }
 
-func (c *openAICompatConfig) WithHeaders(headers map[string]string) *openAICompatConfig {
+func (c *OpenAICompatConfig) WithHeaders(headers map[string]string) *OpenAICompatConfig {
 	c.headers = headers
 	return c
 }
 
-func (c *openAICompatConfig) WithQueryParams(queryParams map[string]string) *openAICompatConfig {
+func (c *OpenAICompatConfig) WithQueryParams(queryParams map[string]string) *OpenAICompatConfig {
 	c.queryParams = queryParams
 	return c
 }
 
-func (c *openAICompatConfig) WithNormalized(normalized bool) *openAICompatConfig {
+func (c *OpenAICompatConfig) WithNormalized(normalized bool) *OpenAICompatConfig {
 	c.normalized = &normalized
 	return c
 }

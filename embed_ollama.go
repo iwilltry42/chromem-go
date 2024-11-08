@@ -84,14 +84,14 @@ func NewEmbeddingFuncOllama(model string, baseURLOllama string) EmbeddingFunc {
 
 		v := embeddingResponse.Embedding
 		checkNormalized.Do(func() {
-			if isNormalized(v) {
+			if IsNormalized(v) {
 				checkedNormalized = true
 			} else {
 				checkedNormalized = false
 			}
 		})
 		if !checkedNormalized {
-			v = normalizeVector(v)
+			v = NormalizeVector(v)
 		}
 
 		return v, nil

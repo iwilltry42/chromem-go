@@ -270,8 +270,8 @@ func (c *Collection) AddDocument(ctx context.Context, doc Document) error {
 		}
 		doc.Embedding = embedding
 	} else {
-		if !isNormalized(doc.Embedding) {
-			doc.Embedding = normalizeVector(doc.Embedding)
+		if !IsNormalized(doc.Embedding) {
+			doc.Embedding = NormalizeVector(doc.Embedding)
 		}
 	}
 
@@ -442,13 +442,13 @@ func (c *Collection) QueryWithOptions(ctx context.Context, options QueryOptions)
 	}
 
 	if len(negativeVector) != 0 {
-		if !isNormalized(negativeVector) {
-			negativeVector = normalizeVector(negativeVector)
+		if !IsNormalized(negativeVector) {
+			negativeVector = NormalizeVector(negativeVector)
 		}
 
 		if options.Negative.Mode == NEGATIVE_MODE_SUBTRACT {
 			queryVector = subtractVector(queryVector, negativeVector)
-			queryVector = normalizeVector(queryVector)
+			queryVector = NormalizeVector(queryVector)
 		} else if options.Negative.Mode == NEGATIVE_MODE_FILTER {
 			if negativeFilterThreshold == 0 {
 				negativeFilterThreshold = DEFAULT_NEGATIVE_FILTER_THRESHOLD
@@ -509,8 +509,8 @@ func (c *Collection) queryEmbedding(ctx context.Context, queryEmbedding, negativ
 
 	// Normalize embedding if not the case yet. We only support cosine similarity
 	// for now and all documents were already normalized when added to the collection.
-	if !isNormalized(queryEmbedding) {
-		queryEmbedding = normalizeVector(queryEmbedding)
+	if !IsNormalized(queryEmbedding) {
+		queryEmbedding = NormalizeVector(queryEmbedding)
 	}
 
 	// If the filtering already reduced the number of documents to fewer than nResults,

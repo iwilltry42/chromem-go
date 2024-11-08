@@ -25,7 +25,7 @@ func dotProduct(a, b []float32) (float32, error) {
 	return dotProduct, nil
 }
 
-func normalizeVector(v []float32) []float32 {
+func NormalizeVector(v []float32) []float32 {
 	var norm float32
 	for _, val := range v {
 		norm += val * val
@@ -51,8 +51,8 @@ func subtractVector(a, b []float32) []float32 {
 	return res
 }
 
-// isNormalized checks if the vector is normalized.
-func isNormalized(v []float32) bool {
+// IsNormalized checks if the vector is normalized.
+func IsNormalized(v []float32) bool {
 	var sqSum float64
 	for _, val := range v {
 		sqSum += float64(val) * float64(val)

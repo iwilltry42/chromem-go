@@ -142,14 +142,14 @@ func NewEmbeddingFuncVertex(apiKey, project string, model EmbeddingModelVertex, 
 
 		v := embeddingResponse.Predictions[0].Embeddings.Values
 		checkNormalized.Do(func() {
-			if isNormalized(v) {
+			if IsNormalized(v) {
 				checkedNormalized = true
 			} else {
 				checkedNormalized = false
 			}
 		})
 		if !checkedNormalized {
-			v = normalizeVector(v)
+			v = NormalizeVector(v)
 		}
 
 		return v, nil

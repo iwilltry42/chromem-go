@@ -622,7 +622,7 @@ func benchmarkCollection_Query(b *testing.B, n int, withContent bool) {
 		qv[j] = r.Float32()
 	}
 	// The document embeddings are normalized, so the query must be normalized too.
-	qv = normalizeVector(qv)
+	qv = NormalizeVector(qv)
 
 	// Create collection
 	db := NewDB()
@@ -645,7 +645,7 @@ func benchmarkCollection_Query(b *testing.B, n int, withContent bool) {
 		for j := 0; j < d; j++ {
 			v[j] = r.Float32()
 		}
-		v = normalizeVector(v)
+		v = NormalizeVector(v)
 
 		// Add document with some metadata and content depending on parameter.
 		// When providing embeddings, the embedding func is not called.

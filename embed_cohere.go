@@ -153,14 +153,14 @@ func NewEmbeddingFuncCohere(apiKey string, model EmbeddingModelCohere) Embedding
 
 		v := embeddingResponse.Embeddings[0]
 		checkNormalized.Do(func() {
-			if isNormalized(v) {
+			if IsNormalized(v) {
 				checkedNormalized = true
 			} else {
 				checkedNormalized = false
 			}
 		})
 		if !checkedNormalized {
-			v = normalizeVector(v)
+			v = NormalizeVector(v)
 		}
 
 		return v, nil
