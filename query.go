@@ -129,6 +129,7 @@ func filterDocs(docs map[string]*Document, where map[string]string, whereDocumen
 type WhereDocumentOperator string
 
 const (
+	WhereDocumentOperatorEquals      WhereDocumentOperator = "$eq"
 	WhereDocumentOperatorContains    WhereDocumentOperator = "$contains"
 	WhereDocumentOperatorNotContains WhereDocumentOperator = "$not_contains"
 	WhereDocumentOperatorOr          WhereDocumentOperator = "$or"
@@ -151,8 +152,8 @@ func (wd *WhereDocument) Validate() error {
 		return fmt.Errorf("where document operator is empty")
 	}
 
-	// $contains and $not_contains require a string value
-	if slices.Contains([]WhereDocumentOperator{WhereDocumentOperatorContains, WhereDocumentOperatorNotContains}, wd.Operator) {
+	// $eq, $contains and $not_contains require a string value
+	if slices.Contains([]WhereDocumentOperator{WhereDocumentOperatorEquals, WhereDocumentOperatorContains, WhereDocumentOperatorNotContains}, wd.Operator) {
 		if wd.Value == "" {
 			return fmt.Errorf("where document operator %s requires a value", wd.Operator)
 		}
@@ -178,6 +179,8 @@ func (wd *WhereDocument) Validate() error {
 // There is no error checking on the WhereDocument struct, so it must be validated before calling this function.
 func (wd *WhereDocument) Matches(doc *Document) bool {
 	switch wd.Operator {
+	case WhereDocumentOperatorEquals:
+		return doc.Content == wd.Value
 	case WhereDocumentOperatorContains:
 		return strings.Contains(doc.Content, wd.Value)
 	case WhereDocumentOperatorNotContains:
